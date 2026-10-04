@@ -1,44 +1,43 @@
-import numpy as np
-import pandas
+import csv
 
 if __name__ == "__main__":
-    # Mengolah csv stock_train.csv menjadi pandas.df
-    df = pandas.read_csv("stock_train.csv")
+    # Mengolah csv stock_train.csv menjadi list of dict
+    with open("stock_train.csv", newline="") as f:
+        reader = csv.DictReader(f)
+        close = [float(row["Close"]) for row in reader]
 
     # Calculates Return vector
-    # df['Close'].diff(1) = df['Close'][i] - df['CLose'][i-1]
-    # df['Close'].shift(1) = df['Close'][i-1]
-    df['Return'] = (df['Close'].diff(1) / df['Close'].shift(1))
+    # return_[i] = (close[i] - close[i-1]) / close[i-1]
+    return_ = [None] * len(close)
+    for i in range(1, len(close)):
+        return_[i] = (close[i] - close[i - 1]) / close[i - 1]
 
     ##### --------- #####
     # Building A        #
     ##### --------- #####
 
-    return_col = df['Return']
-    lag1 = return_col.shift(1) # R[i-1]
-    lag2 = return_col.shift(2) # R[i-2]
+    matrix_A = []
+    vector_B = []
 
-    # Makes sure we build A with valid elements
-    valid = lag1.notna() & lag2.notna()
-    l1 = lag1[valid]
-    l2 = lag2[valid]
+    for i in range(len(close)):
+        l1 = return_[i - 1] if i - 1 >= 0 else None  # R[i-1]
+        l2 = return_[i - 2] if i - 2 >= 0 else None  # R[i-2]
 
-    # Boolean mask for flag
-    pos = l1 >= 0
-    neg = ~pos
+        # Makes sure we build A with valid elements
+        if l1 is None or l2 is None:
+            continue
 
-    # Builds overdetermined matrix A
-    matrix_A = np.column_stack([
-        pos, pos * l1, pos * l2, # 1, R[i-1], R[i-2]
-        neg, neg * l1, neg * l2
-    ]).astype(float)
+        pos = l1 >= 0
+        neg = not pos
 
-    ## print(matrix_A)
+        # Builds overdetermined matrix A
+        matrix_A.append([
+            1.0 if pos else 0.0, l1 if pos else 0.0, l2 if pos else 0.0,  # 1, R[i-1], R[i-2]
+            1.0 if neg else 0.0, l1 if neg else 0.0, l2 if neg else 0.0,
+        ])
 
-    ##### --------- #####
-    # Building B       #
-    ##### --------- #####
+        ##### --------- #####
+        # Building B       #
+        ##### --------- #####
 
-    vector_B = df[valid]['Return'].to_numpy()
-
-    ## print(vector_B)
+        vector_B.append(return_[i])
